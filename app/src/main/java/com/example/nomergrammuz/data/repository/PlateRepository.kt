@@ -96,4 +96,30 @@ class PlateRepository(
         val dtoList: List<PlateRuleDto> = gson.fromJson(jsonString, type)
         return dtoList.map { it.toDomain() }
     }
+
+    suspend fun refreshFromRemote(url: String = DEFAULT_URL): Result<Int> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.requestMethod = "GET"
+
+            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                val json = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val newRules = parseRemoteJson(json)
+                if (newRules.isNotEmpty()) {
+                    updateRules(newRules)
+                    newRules.size
+                } else {
+                    cachedRules.size
+                }
+            } else {
+                cachedRules.size
+            }
+        }
+    }
+
+    companion object {
+        const val DEFAULT_URL = "https://raw.githubusercontent.com/User/NomerGrammUZ/main/database/plates_registry.json"
+    }
 }

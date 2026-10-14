@@ -19,7 +19,8 @@ enum class PlateTheme {
     BLUE,               // UN agencies
     YELLOW,             // Foreign citizens (H), Taxi
     WHITE_GOV_FLAG,     // Type II (PAA, PPP, APC, etc. with national flag on the left, no region)
-    EV_GREEN_ZONE       // White plate with green region block (Electric Vehicles)
+    EV_GREEN_ZONE,      // White plate with green region block (Electric Vehicles)
+    BLACK               // Military vehicles (Mudofaa vazirligi - black background, white text)
 }
 
 enum class PlateFormatType {
@@ -36,5 +37,6 @@ enum class PlateFormatType {
     CIVILIAN_LEGAL,     // 01 123 AAA (Type I)
     PUBLIC_TAXI,        // 01 123 TAA..TTG
     EMERGENCY_SERVICE,  // 01 123 STY
+    MILITARY,           // 01 1234 MV (Black plate, white text)
     UNKNOWN
 }

@@ -20,8 +20,11 @@ object PlateNormalizer {
         "ВСС" to "VSC",
         "ВSС" to "VSC",
         "СТЙ" to "STY",
-        "СТИ" to "STY"
+        "СТИ" to "STY",
+        "УН" to "UN"
     )
+
+    private val prefixRegex = Regex("^(серия|seriya|series|тип|type|номер|raqam|raqami|код|kod|регион|region|viloyat|viloyati|область|посольство|elchixona)\\s+", RegexOption.IGNORE_CASE)
 
     private val cyrillicToLatinMap = mapOf(
         // Visual homoglyphs (lookalikes)
@@ -48,15 +51,18 @@ object PlateNormalizer {
 
     /**
      * Normalizes an input string:
-     * 1. Replaces known Russian acronym tokens (e.g. СМД -> CMD, ВСВ -> VSB).
-     * 2. Translates individual Cyrillic letters to Latin uppercase.
-     * 3. Trims and collapses multiple spaces.
+     * 1. Strips descriptive prefixes like "серия ", "тип ", "номер ".
+     * 2. Replaces known Russian acronym tokens (e.g. СМД -> CMD, ООН -> UN, ДАВ -> DAV).
+     * 3. Translates individual Cyrillic letters to Latin uppercase.
+     * 4. Trims and collapses multiple spaces.
      */
     fun normalize(input: String): String {
         if (input.isBlank()) return ""
 
+        val stripped = prefixRegex.replace(input.trim(), "").trim()
+
         // 1. Token-level acronym replacement
-        val tokens = input.trim().split(Regex("\\s+")).map { token ->
+        val tokens = stripped.split(Regex("\\s+")).map { token ->
             cyrillicAcronymMap[token.uppercase()] ?: token
         }
         val tokenized = tokens.joinToString(" ")
