@@ -15,4 +15,3 @@ keystore.properties
 keystore/
 *.apk
 *.aab
-/release/
