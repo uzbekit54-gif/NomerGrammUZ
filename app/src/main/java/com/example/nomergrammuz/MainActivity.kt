@@ -23,7 +23,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -476,10 +481,15 @@ fun MainAppHost() {
             val coroutineScope = rememberCoroutineScope()
             val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
-            // Auto-hide keyboard on list scroll (Decision A2)
-            LaunchedEffect(mainScrollState.isScrollInProgress) {
-                if (mainScrollState.isScrollInProgress) {
-                    keyboardController?.hide()
+            // Dismiss keyboard ONLY on manual user finger drag (never on programmatic scroll, IME resize, or bringIntoView)
+            val nestedScrollConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        if (source == NestedScrollSource.UserInput && kotlin.math.abs(available.y) > 12f) {
+                            keyboardController?.hide()
+                        }
+                        return Offset.Zero
+                    }
                 }
             }
 
@@ -494,6 +504,7 @@ fun MainAppHost() {
                         .fillMaxSize()
                         .padding(innerPadding)
                         .imePadding()
+                        .nestedScroll(nestedScrollConnection)
                         .verticalScroll(mainScrollState)
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
@@ -762,6 +773,7 @@ fun MainAppHost() {
                             .onFocusEvent { focusState ->
                                 if (focusState.isFocused) {
                                     coroutineScope.launch {
+                                        delay(200)
                                         bringIntoViewRequester.bringIntoView()
                                     }
                                 }
