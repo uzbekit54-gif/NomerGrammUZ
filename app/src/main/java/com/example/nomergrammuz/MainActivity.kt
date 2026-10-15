@@ -23,10 +23,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,11 +42,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -131,6 +130,7 @@ fun MainAppHost() {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     val repository = remember { PlateRepository(context) }
     val userPrefsRepo = remember { UserPreferencesRepository(context) }
@@ -481,18 +481,6 @@ fun MainAppHost() {
             val coroutineScope = rememberCoroutineScope()
             val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
-            // Dismiss keyboard ONLY on manual user finger drag (never on programmatic scroll, IME resize, or bringIntoView)
-            val nestedScrollConnection = remember {
-                object : NestedScrollConnection {
-                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        if (source == NestedScrollSource.UserInput && kotlin.math.abs(available.y) > 12f) {
-                            keyboardController?.hide()
-                        }
-                        return Offset.Zero
-                    }
-                }
-            }
-
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
@@ -504,7 +492,6 @@ fun MainAppHost() {
                         .fillMaxSize()
                         .padding(innerPadding)
                         .imePadding()
-                        .nestedScroll(nestedScrollConnection)
                         .verticalScroll(mainScrollState)
                         .padding(horizontal = 20.dp, vertical = 12.dp)
                 ) {
@@ -601,6 +588,7 @@ fun MainAppHost() {
                             isSelected = activeCategory == MainSearchCategory.REGIONS,
                             onClick = {
                                 keyboardController?.hide()
+                                focusManager.clearFocus()
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (activeCategory == MainSearchCategory.REGIONS) {
                                     activeCategory = MainSearchCategory.ALL
@@ -619,6 +607,7 @@ fun MainAppHost() {
                             isSelected = activeCategory == MainSearchCategory.DIPLOMATS,
                             onClick = {
                                 keyboardController?.hide()
+                                focusManager.clearFocus()
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (activeCategory == MainSearchCategory.DIPLOMATS) {
                                     activeCategory = MainSearchCategory.ALL
@@ -644,6 +633,7 @@ fun MainAppHost() {
                             isSelected = activeCategory == MainSearchCategory.GOVERNMENT,
                             onClick = {
                                 keyboardController?.hide()
+                                focusManager.clearFocus()
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (activeCategory == MainSearchCategory.GOVERNMENT) {
                                     activeCategory = MainSearchCategory.ALL
@@ -662,6 +652,7 @@ fun MainAppHost() {
                             isSelected = activeCategory == MainSearchCategory.MILITARY,
                             onClick = {
                                 keyboardController?.hide()
+                                focusManager.clearFocus()
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (activeCategory == MainSearchCategory.MILITARY) {
                                     activeCategory = MainSearchCategory.ALL
@@ -749,6 +740,8 @@ fun MainAppHost() {
                                     .border(1.dp, AutoBorder, RoundedCornerShape(12.dp))
                                     .clickable {
                                         activeCategory = MainSearchCategory.ALL
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
                                     }
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
@@ -764,9 +757,23 @@ fun MainAppHost() {
                     }
 
                     // Search Input Field
+                    val inputInteractionSource = remember { MutableInteractionSource() }
+                    LaunchedEffect(inputInteractionSource) {
+                        inputInteractionSource.interactions.collect { interaction ->
+                            if (interaction is PressInteraction.Release) {
+                                keyboardController?.show()
+                                coroutineScope.launch {
+                                    delay(150)
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
+                        interactionSource = inputInteractionSource,
                         modifier = Modifier
                             .fillMaxWidth()
                             .bringIntoViewRequester(bringIntoViewRequester)
@@ -797,6 +804,7 @@ fun MainAppHost() {
                                         .clickable {
                                             inputText = ""
                                             keyboardController?.hide()
+                                            focusManager.clearFocus()
                                         }
                                         .padding(8.dp)
                                 )
@@ -817,7 +825,10 @@ fun MainAppHost() {
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
-                            onDone = { keyboardController?.hide() }
+                            onDone = {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                            }
                         )
                     )
 
@@ -845,6 +856,7 @@ fun MainAppHost() {
                                     .clickable {
                                         inputText = code
                                         keyboardController?.hide()
+                                        focusManager.clearFocus()
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     }
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -884,6 +896,7 @@ fun MainAppHost() {
                                             inputText = samplePlate
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             keyboardController?.hide()
+                                            focusManager.clearFocus()
                                         }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
