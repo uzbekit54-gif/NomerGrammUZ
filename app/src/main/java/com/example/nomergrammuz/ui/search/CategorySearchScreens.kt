@@ -403,21 +403,21 @@ fun DiplomatSearchScreen(
                     }
                     rule.series == "D" && rule.countryCode != null -> {
                         val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "$c D 001"
+                        "D $c 001"
                     }
                     rule.series == "UN" -> "UN 0001"
                     rule.series == "T" && rule.countryCode != null -> {
                         val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "$c T 012"
+                        "T $c 012"
                     }
                     rule.series == "X" && rule.countryCode != null -> {
                         val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "$c X 001"
+                        "X $c 001"
                     }
                     rule.series == "CMD" -> "CMD 0701"
-                    rule.series == "D" -> "007 D 012"
-                    rule.series == "T" -> "007 T 012"
-                    rule.series == "X" -> "007 X 001"
+                    rule.series == "D" -> "D 007 012"
+                    rule.series == "T" -> "T 007 012"
+                    rule.series == "X" -> "X 007 001"
                     rule.countryCode != null -> {
                         val c = if (rule.countryCode < 10) "0${rule.countryCode}01" else "${rule.countryCode}01"
                         "CMD $c"

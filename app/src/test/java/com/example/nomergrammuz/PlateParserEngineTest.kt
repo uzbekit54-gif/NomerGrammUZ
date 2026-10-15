@@ -86,6 +86,14 @@ class PlateParserEngineTest {
         assertEquals(PlateFormatType.DIPLOMAT, result.formatType)
         assertEquals(PlateTheme.GREEN, result.theme)
         assertEquals("Российская Федерация", result.countryName)
+        assertEquals("D 007 012", result.formattedPlate)
+
+        // Typing "D 007" must keep D on the left and never mirror to "007 D"
+        val resultD007 = parserEngine.parse("D 007", isRussian = true)
+        assertTrue(resultD007.isIdentified)
+        assertEquals(PlateFormatType.DIPLOMAT, resultD007.formatType)
+        assertEquals("D 007", resultD007.formattedPlate)
+        assertEquals("Российская Федерация", resultD007.countryName)
     }
 
     @Test
@@ -296,12 +304,14 @@ class PlateParserEngineTest {
         assertTrue(dResult.isIdentified)
         assertEquals(PlateFormatType.DIPLOMAT, dResult.formatType)
         assertEquals("Российская Федерация", dResult.countryName)
+        assertEquals("D 007 012", dResult.formattedPlate)
 
         // Decree Annex 2 format: T 007012
         val tResult = parserEngine.parse("T 007012", isRussian = true)
         assertTrue(tResult.isIdentified)
         assertEquals(PlateFormatType.TECHNICAL_STAFF, tResult.formatType)
         assertEquals("Российская Федерация", tResult.countryName)
+        assertEquals("T 007 012", tResult.formattedPlate)
 
         // Decree Annex 2 format: 01 M 123456
         val mResult = parserEngine.parse("01 M 123456", isRussian = true)

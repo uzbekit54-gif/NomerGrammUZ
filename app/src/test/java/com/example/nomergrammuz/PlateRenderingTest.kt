@@ -169,4 +169,32 @@ class PlateRenderingTest {
         assertEquals("01", partsWithoutReg.region)
         assertEquals("1234 MV", partsWithoutReg.body)
     }
+
+    @Test
+    fun testDiplomaticPlatesDoNotMirrorD007() {
+        // User types "D 007" - must display "D 007" on plate, NEVER "007 D"
+        val resD007 = parserEngine.parse("D 007", isRussian = true)
+        assertEquals("D 007", resD007.formattedPlate)
+        assertNotEquals("007 D", resD007.formattedPlate)
+        assertEquals("Российская Федерация", resD007.countryName)
+
+        // User types "D 007 012" - must format as "D 007 012"
+        val resD007012 = parserEngine.parse("D 007 012", isRussian = true)
+        assertEquals("D 007 012", resD007012.formattedPlate)
+        assertNotEquals("007 D 012", resD007012.formattedPlate)
+
+        // User types "007 D 012" - formatted with D prefix per Decree 131
+        val res007D = parserEngine.parse("007 D 012", isRussian = true)
+        assertEquals("D 007 012", res007D.formattedPlate)
+
+        // Technical staff "T 007"
+        val resT007 = parserEngine.parse("T 007", isRussian = true)
+        assertEquals("T 007", resT007.formattedPlate)
+        assertNotEquals("007 T", resT007.formattedPlate)
+
+        // Consular "X 007"
+        val resX007 = parserEngine.parse("X 007", isRussian = true)
+        assertEquals("X 007", resX007.formattedPlate)
+        assertNotEquals("007 X", resX007.formattedPlate)
+    }
 }

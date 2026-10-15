@@ -86,20 +86,23 @@ class PlateParserEngine(
 
         // 1b. D (Type V - Diplomatic Staff & Consuls)
         if (compact == "D") {
-            return resolveDiplomat(rawInput, normalized, "", null, isRussian)
+            return resolveDiplomat(rawInput, normalized, "D 000000", null, isRussian)
         }
         val dCompactMatch = dRegexCompact.find(compact)
         if (dCompactMatch != null) {
             val fullDigits = dCompactMatch.groupValues[1]
             val countryCode = fullDigits.take(3).toIntOrNull()
+            val countryCodeStr = fullDigits.take(3)
             val numPart = fullDigits.drop(3)
-            return resolveDiplomat(rawInput, normalized, "${countryCode ?: 0} D $numPart", countryCode, isRussian)
+            val formatted = if (numPart.isNotEmpty()) "D $countryCodeStr $numPart" else "D $countryCodeStr"
+            return resolveDiplomat(rawInput, normalized, formatted, countryCode, isRussian)
         }
-        val dMatch = dRegex1.find(compact) ?: dRegex2.find(compact)
+        val dMatch = dRegex2.find(compact) ?: dRegex1.find(compact)
         if (dMatch != null) {
-            val countryCode = dMatch.groupValues[1].toIntOrNull()
+            val countryCodeStr = dMatch.groupValues[1]
+            val countryCode = countryCodeStr.toIntOrNull()
             val numPart = dMatch.groupValues[2]
-            val formatted = if (numPart.isNotEmpty()) "${dMatch.groupValues[1]} D $numPart" else "${dMatch.groupValues[1]} D"
+            val formatted = if (numPart.isNotEmpty()) "D $countryCodeStr $numPart" else "D $countryCodeStr"
             return resolveDiplomat(rawInput, normalized, formatted, countryCode, isRussian)
         }
 
@@ -129,14 +132,17 @@ class PlateParserEngine(
         if (tCompactMatch != null) {
             val fullDigits = tCompactMatch.groupValues[1]
             val countryCode = fullDigits.take(3).toIntOrNull()
+            val countryCodeStr = fullDigits.take(3)
             val numPart = fullDigits.drop(3)
-            return resolveTechnicalStaff(rawInput, normalized, "${countryCode ?: 0} T $numPart", countryCode, isRussian)
+            val formatted = if (numPart.isNotEmpty()) "T $countryCodeStr $numPart" else "T $countryCodeStr"
+            return resolveTechnicalStaff(rawInput, normalized, formatted, countryCode, isRussian)
         }
-        val tMatch = tRegex1.find(compact) ?: tRegex2.find(compact)
+        val tMatch = tRegex2.find(compact) ?: tRegex1.find(compact)
         if (tMatch != null) {
-            val countryCode = tMatch.groupValues[1].toIntOrNull()
+            val countryCodeStr = tMatch.groupValues[1]
+            val countryCode = countryCodeStr.toIntOrNull()
             val numPart = tMatch.groupValues[2]
-            val formatted = if (numPart.isNotEmpty()) "${tMatch.groupValues[1]} T $numPart" else "${tMatch.groupValues[1]} T"
+            val formatted = if (numPart.isNotEmpty()) "T $countryCodeStr $numPart" else "T $countryCodeStr"
             return resolveTechnicalStaff(rawInput, normalized, formatted, countryCode, isRussian)
         }
 
@@ -148,14 +154,17 @@ class PlateParserEngine(
         if (xCompactMatch != null) {
             val fullDigits = xCompactMatch.groupValues[1]
             val countryCode = fullDigits.take(3).toIntOrNull()
+            val countryCodeStr = fullDigits.take(3)
             val numPart = fullDigits.drop(3)
-            return resolveConsular(rawInput, normalized, "${countryCode ?: 0} X $numPart", countryCode, isRussian)
+            val formatted = if (numPart.isNotEmpty()) "X $countryCodeStr $numPart" else "X $countryCodeStr"
+            return resolveConsular(rawInput, normalized, formatted, countryCode, isRussian)
         }
-        val xMatch = xRegex1.find(compact) ?: xRegex2.find(compact)
+        val xMatch = xRegex2.find(compact) ?: xRegex1.find(compact)
         if (xMatch != null) {
-            val countryCode = xMatch.groupValues[1].toIntOrNull()
+            val countryCodeStr = xMatch.groupValues[1]
+            val countryCode = countryCodeStr.toIntOrNull()
             val numPart = xMatch.groupValues[2]
-            val formatted = if (numPart.isNotEmpty()) "${xMatch.groupValues[1]} X $numPart" else "${xMatch.groupValues[1]} X"
+            val formatted = if (numPart.isNotEmpty()) "X $countryCodeStr $numPart" else "X $countryCodeStr"
             return resolveConsular(rawInput, normalized, formatted, countryCode, isRussian)
         }
 

@@ -267,7 +267,7 @@ fun MainAppHost() {
                         }
                         selectedRule.series == "D" && selectedRule.countryCode != null -> {
                             val codeStr = if (selectedRule.countryCode < 10) "00${selectedRule.countryCode}" else if (selectedRule.countryCode < 100) "0${selectedRule.countryCode}" else "${selectedRule.countryCode}"
-                            "$codeStr D 001"
+                            "D $codeStr 001"
                         }
                         selectedRule.plateTheme == PlateTheme.BLACK || selectedRule.id == "gov_defense_troops" -> "01 1234 MV"
                         selectedRule.series == "DAV" -> "01 123 DAV"
@@ -275,8 +275,8 @@ fun MainAppHost() {
                         selectedRule.series == "M" -> "01 M 123456"
                         selectedRule.series == "H" -> "01 H 123456"
                         selectedRule.series == "UN" -> "UN 0001"
-                        selectedRule.series == "T" -> "007 T 012"
-                        selectedRule.series == "X" -> "007 X 001"
+                        selectedRule.series == "T" -> "T 007 012"
+                        selectedRule.series == "X" -> "X 007 001"
                         selectedRule.series?.contains("EV") == true -> "01 A 777 AA"
                         selectedRule.series != null -> "${selectedRule.series.split(',').first().trim()} 001"
                         selectedRule.regionCode != null -> "${selectedRule.regionCode} A 777 AA"
@@ -365,11 +365,11 @@ fun MainAppHost() {
                         "CMD 0101" to (if (isRussian) "CMD 01 Посол Франции" else "CMD Fransiya Elchisi"),
                         "CMD 3001" to (if (isRussian) "CMD 30 Посол Казахстана" else "CMD Qozog'iston"),
                         "CMD 4101" to (if (isRussian) "CMD 41 Делегация ЕС" else "CMD YeI Delegatsiyasi"),
-                        "007 D 001" to (if (isRussian) "007 D Дипломат РФ" else "007 D Rossiya"),
-                        "010 D 001" to (if (isRussian) "010 D Дипломат США" else "010 D AQSh"),
+                        "D 007 001" to (if (isRussian) "D 007 Дипломат РФ" else "D 007 Rossiya"),
+                        "D 010 001" to (if (isRussian) "D 010 Дипломат США" else "D 010 AQSh"),
                         "UN 0001" to (if (isRussian) "UN Представительство ООН" else "UN BMT vakolatxonasi"),
-                        "007 T 012" to (if (isRussian) "Серия T (Техперсонал)" else "T seriyasi"),
-                        "007 X 001" to (if (isRussian) "Серия X (Консулы)" else "X seriyasi")
+                        "T 007 012" to (if (isRussian) "Серия T (Техперсонал)" else "T seriyasi"),
+                        "X 007 001" to (if (isRussian) "Серия X (Консулы)" else "X seriyasi")
                     )
                     MainSearchCategory.GOVERNMENT -> listOf(
                         "PAA 001" to (if (isRussian) "PAA Президент / Кабмин" else "PAA Prezident"),
@@ -462,15 +462,15 @@ fun MainAppHost() {
                     }
                     rule.series == "D" && rule.countryCode != null -> {
                         val codeStr = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "$codeStr D 001"
+                        "D $codeStr 001"
                     }
                     rule.series == "DAV" -> "01 123 DAV"
                     rule.series == "STY" -> "01 103 STY"
                     rule.series == "M" -> "01 M 123456"
                     rule.series == "H" -> "01 H 123456"
                     rule.series == "UN" -> "UN 0001"
-                    rule.series == "T" -> "007 T 012"
-                    rule.series == "X" -> "007 X 001"
+                    rule.series == "T" -> "T 007 012"
+                    rule.series == "X" -> "X 007 001"
                     rule.series != null -> "${rule.series.split(',').first().trim()} 001"
                     rule.regionCode != null -> "${rule.regionCode} 001 AAA"
                     else -> "01 A 001 AA"
