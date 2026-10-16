@@ -1,29 +1,53 @@
 package com.example.nomergrammuz.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -162,10 +186,32 @@ fun resolveMilitaryPlateParts(result: ParsedPlateResult): MilitaryPlateParts {
 fun UzbekistanLicensePlate(
     result: ParsedPlateResult,
     modifier: Modifier = Modifier,
-    placeholderText: String = "01 A 001 AA"
+    placeholderText: String = "01 A 001 AA",
+    isEditable: Boolean = false,
+    inputText: String = "",
+    onInputTextChange: (String) -> Unit = {},
+    focusRequester: FocusRequester? = null,
+    isFocused: Boolean = false,
+    onFocusChange: ((Boolean) -> Unit)? = null,
+    onClearText: (() -> Unit)? = null
 ) {
     val plateTheme = result.theme
     val formatType = result.formatType
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
+    val cursorAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(450),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cursorAlpha"
+    )
 
     val targetBgColor = when (plateTheme) {
         PlateTheme.GREEN -> PlateGreenBg
@@ -193,15 +239,32 @@ fun UzbekistanLicensePlate(
     val animatedTextColor by animateColorAsState(targetTextColor, animationSpec = tween(300), label = "text")
 
     val shape = RoundedCornerShape(8.dp)
+    val activeBorderColor = if (isFocused) PlateEvGreenBadge else animatedBorderColor
+    val activeBorderWidth = if (isFocused) 3.5.dp else 3.dp
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(78.dp)
-            .shadow(elevation = 8.dp, shape = shape, spotColor = Color.Black)
+            .shadow(
+                elevation = if (isFocused) 12.dp else 8.dp,
+                shape = shape,
+                spotColor = if (isFocused) PlateEvGreenBadge.copy(alpha = 0.5f) else Color.Black
+            )
             .clip(shape)
             .background(animatedBgColor)
-            .border(width = 3.dp, color = animatedBorderColor, shape = shape)
+            .border(width = activeBorderWidth, color = activeBorderColor, shape = shape)
+            .then(
+                if (isEditable && focusRequester != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    }
+                } else Modifier
+            )
             .padding(3.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -211,7 +274,9 @@ fun UzbekistanLicensePlate(
                 .matchParentSize()
                 .border(
                     width = 1.dp,
-                    color = if (plateTheme in listOf(PlateTheme.GREEN, PlateTheme.BLUE, PlateTheme.BLACK)) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.2f),
+                    color = if (plateTheme in listOf(PlateTheme.GREEN, PlateTheme.BLUE, PlateTheme.BLACK))
+                        Color.White.copy(alpha = 0.5f)
+                    else Color.Black.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(5.dp)
                 )
         )
@@ -244,16 +309,30 @@ fun UzbekistanLicensePlate(
                     )
 
                     // Middle: Series and Number (e.g. PAA 001, ZDF 050)
-                    Text(
-                        text = result.formattedPlate.ifEmpty { placeholderText },
+                    Row(
                         modifier = Modifier.weight(1f),
-                        color = animatedTextColor,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 3.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = result.formattedPlate.ifEmpty { placeholderText },
+                            color = animatedTextColor,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 3.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(28.dp)
+                                    .background(animatedTextColor.copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
 
                     // Right spacer to keep number centered relative to full plate
                     Spacer(modifier = Modifier.width(48.dp))
@@ -269,18 +348,32 @@ fun UzbekistanLicensePlate(
                     PlateFormatType.TECHNICAL_STAFF,
                     PlateFormatType.CONSULAR
                 ) -> {
-                    Text(
-                        text = result.formattedPlate.ifEmpty { placeholderText },
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp),
-                        color = animatedTextColor,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 4.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = result.formattedPlate.ifEmpty { placeholderText },
+                            color = animatedTextColor,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 4.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(28.dp)
+                                    .background(animatedTextColor.copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
                 }
 
                 // -----------------------------------------------------------------
@@ -329,16 +422,30 @@ fun UzbekistanLicensePlate(
                     )
 
                     // Right: M + Digits
-                    Text(
-                        text = "M $bodyPart",
+                    Row(
                         modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 3.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "M $bodyPart",
+                            color = Color.White,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 3.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(27.dp)
+                                    .background(Color.White.copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.width(44.dp))
                 }
@@ -389,16 +496,30 @@ fun UzbekistanLicensePlate(
                     )
 
                     // Right: H + Digits
-                    Text(
-                        text = "H $bodyPart",
+                    Row(
                         modifier = Modifier.weight(1f),
-                        color = Color(0xFF0F172A),
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 3.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "H $bodyPart",
+                            color = Color(0xFF0F172A),
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 3.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(27.dp)
+                                    .background(Color(0xFF0F172A).copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.width(44.dp))
                 }
@@ -436,16 +557,30 @@ fun UzbekistanLicensePlate(
                     )
 
                     // Middle: 4 digits + MV
-                    Text(
-                        text = bodyPart,
+                    Row(
                         modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 4.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = bodyPart,
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 4.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(28.dp)
+                                    .background(Color.White.copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
 
                     // Right spacer for visual symmetry
                     Spacer(modifier = Modifier.width(46.dp))
@@ -502,16 +637,30 @@ fun UzbekistanLicensePlate(
                     )
 
                     // Middle: Registration Numbers & Letters
-                    Text(
-                        text = parts.number,
+                    Row(
                         modifier = Modifier.weight(1f),
-                        color = numberColor,
-                        fontSize = if (parts.number.length > 9) 22.sp else 26.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp,
-                        textAlign = TextAlign.Center
-                    )
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = parts.number,
+                            color = numberColor,
+                            fontSize = if (parts.number.length > 9) 22.sp else 26.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (isEditable && isFocused) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(2.5.dp)
+                                    .height(26.dp)
+                                    .background(animatedTextColor.copy(alpha = cursorAlpha))
+                            )
+                        }
+                    }
 
                     // Right: Flag Badge with UZ text (no vertical line before it, as in Decree № 131)
                     UzbekistanFlagBadge(
@@ -524,6 +673,41 @@ fun UzbekistanLicensePlate(
                     )
                 }
             }
+        }
+
+        // Invisible BasicTextField layered over plate to capture software keyboard inputs
+        if (isEditable && focusRequester != null) {
+            BasicTextField(
+                value = inputText,
+                onValueChange = onInputTextChange,
+                modifier = Modifier
+                    .matchParentSize()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { state ->
+                        onFocusChange?.invoke(state.isFocused)
+                    },
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    }
+                ),
+                singleLine = true,
+                cursorBrush = SolidColor(Color.Transparent),
+                textStyle = TextStyle(
+                    color = Color.Transparent,
+                    fontSize = 1.sp
+                ),
+                decorationBox = { innerTextField ->
+                    Box(modifier = Modifier.size(0.dp)) {
+                        innerTextField()
+                    }
+                }
+            )
         }
     }
 }

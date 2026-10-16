@@ -37,6 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.example.nomergrammuz.domain.model.PlateCategory
 import com.example.nomergrammuz.domain.model.PlateRule
 import com.example.nomergrammuz.domain.model.PlateTheme
+import com.example.nomergrammuz.domain.model.DiplomaticFlags
+import com.example.nomergrammuz.domain.model.DiplomaticCountryMission
+import com.example.nomergrammuz.domain.model.buildDiplomaticCountryMissions
+import com.example.nomergrammuz.ui.components.DiplomaticCountryCard
 import com.example.nomergrammuz.ui.theme.AutoBackground
 import com.example.nomergrammuz.ui.theme.AutoBorder
 import com.example.nomergrammuz.ui.theme.AutoSurface
@@ -252,33 +256,63 @@ fun DiplomatSearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     var subTab by remember { mutableStateOf(DiplomatFilterSubTab.ALL) }
 
-    val filteredDiplomats = remember(rules, searchQuery, subTab, isRussian) {
-        val dipRules = rules.filter { it.category == PlateCategory.DIPLOMATIC && it.series !in listOf("M", "H") }
+    val diplomaticMissions = remember(rules) {
+        buildDiplomaticCountryMissions(rules)
+    }
 
-        dipRules.filter { rule ->
-            val matchesSubTab = when (subTab) {
-                DiplomatFilterSubTab.ALL -> true
-                DiplomatFilterSubTab.HEADS_CMD -> rule.subType == "EMBASSY_HEAD" || rule.series == "CMD"
-                DiplomatFilterSubTab.DIPLOMATS_D -> rule.subType == "DIPLOMAT" || rule.series == "D"
-                DiplomatFilterSubTab.UN_MISSION -> rule.series == "UN"
-                DiplomatFilterSubTab.TECH_STAFF_T -> rule.series == "T"
-                DiplomatFilterSubTab.CONSULAR_X -> rule.series == "X"
+    val filteredDiplomaticMissions = remember(diplomaticMissions, searchQuery, subTab, isRussian) {
+        val base = when (subTab) {
+            DiplomatFilterSubTab.ALL -> diplomaticMissions
+            DiplomatFilterSubTab.HEADS_CMD -> diplomaticMissions.filter { it.cmdPlate != null }
+            DiplomatFilterSubTab.DIPLOMATS_D -> diplomaticMissions.filter { it.dPlate != null }
+            DiplomatFilterSubTab.UN_MISSION -> diplomaticMissions.filter { it.codeDisplay == "UN" }
+            DiplomatFilterSubTab.TECH_STAFF_T, DiplomatFilterSubTab.CONSULAR_X -> emptyList()
+        }
+
+        if (searchQuery.isBlank()) {
+            base
+        } else {
+            val q = searchQuery.trim().lowercase()
+            base.filter { mission ->
+                mission.countryNameRu.lowercase().contains(q) ||
+                        mission.countryNameUz.lowercase().contains(q) ||
+                        mission.orgNameRu.lowercase().contains(q) ||
+                        mission.orgNameUz.lowercase().contains(q) ||
+                        mission.codeDisplay.lowercase().contains(q) ||
+                        (mission.countryCode?.toString() == q) ||
+                        (mission.countryCode != null && String.format("%02d", mission.countryCode).contains(q)) ||
+                        q in listOf("cmd", "d", "un")
             }
+        }
+    }
 
-            val matchesSearch = if (searchQuery.isBlank()) {
-                true
-            } else {
-                val q = searchQuery.trim().lowercase()
-                (rule.countryNameRu?.lowercase()?.contains(q) == true) ||
-                        (rule.countryNameUz?.lowercase()?.contains(q) == true) ||
-                        (rule.orgNameRu.lowercase().contains(q)) ||
-                        (rule.orgNameUz.lowercase().contains(q)) ||
-                        (rule.series?.lowercase()?.contains(q) == true) ||
-                        (rule.countryCode?.toString() == q) ||
-                        (rule.countryCode != null && String.format("%02d", rule.countryCode).contains(q))
+    val filteredOtherDiplomats = remember(rules, searchQuery, subTab, isRussian) {
+        if (subTab != DiplomatFilterSubTab.TECH_STAFF_T && subTab != DiplomatFilterSubTab.CONSULAR_X) {
+            emptyList()
+        } else {
+            val dipRules = rules.filter { it.category == PlateCategory.DIPLOMATIC && it.series !in listOf("M", "H") }
+            dipRules.filter { rule ->
+                val matchesSubTab = when (subTab) {
+                    DiplomatFilterSubTab.TECH_STAFF_T -> rule.series == "T"
+                    DiplomatFilterSubTab.CONSULAR_X -> rule.series == "X"
+                    else -> false
+                }
+
+                val matchesSearch = if (searchQuery.isBlank()) {
+                    true
+                } else {
+                    val q = searchQuery.trim().lowercase()
+                    (rule.countryNameRu?.lowercase()?.contains(q) == true) ||
+                            (rule.countryNameUz?.lowercase()?.contains(q) == true) ||
+                            (rule.orgNameRu.lowercase().contains(q)) ||
+                            (rule.orgNameUz.lowercase().contains(q)) ||
+                            (rule.series?.lowercase()?.contains(q) == true) ||
+                            (rule.countryCode?.toString() == q) ||
+                            (rule.countryCode != null && String.format("%02d", rule.countryCode).contains(q))
+                }
+
+                matchesSubTab && matchesSearch
             }
-
-            matchesSubTab && matchesSearch
         }
     }
 
@@ -317,7 +351,7 @@ fun DiplomatSearchScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (isRussian) "Посольства, миссии и серии CMD, D, UN, T, X" else "Elchixonalar, missiyalar va CMD, D, UN, T, X seriyalari",
+                    text = if (isRussian) "Страны, посольства, флаги и серии CMD, D, UN" else "Davlatlar, elchixonalar, bayroqlar va CMD, D, UN seriyalari",
                     color = AutoTextMuted,
                     fontSize = 11.sp
                 )
@@ -333,7 +367,7 @@ fun DiplomatSearchScreen(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    text = if (isRussian) "Поиск страны или кода (07, США, UN...)" else "Mamlakat yoki kod qidirish (07, AQSh, UN...)",
+                    text = if (isRussian) "Поиск страны или кода (07, США, Россия, UN...)" else "Mamlakat yoki kod qidirish (07, AQSh, Rossiya...)",
                     color = AutoTextMuted,
                     fontSize = 13.sp
                 )
@@ -360,10 +394,10 @@ fun DiplomatSearchScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val tabs = listOf(
-                DiplomatFilterSubTab.ALL to (if (isRussian) "Все" else "Barchasi"),
+                DiplomatFilterSubTab.ALL to (if (isRussian) "Все страны" else "Barchasi"),
                 DiplomatFilterSubTab.HEADS_CMD to (if (isRussian) "CMD Послы" else "CMD Elchilar"),
                 DiplomatFilterSubTab.DIPLOMATS_D to (if (isRussian) "D Дипломаты" else "D Diplomatlar"),
-                DiplomatFilterSubTab.UN_MISSION to (if (isRussian) "UN ООН" else "UN BMT"),
+                DiplomatFilterSubTab.UN_MISSION to (if (isRussian) "🇺🇳 ООН" else "🇺🇳 BMT"),
                 DiplomatFilterSubTab.TECH_STAFF_T to (if (isRussian) "T Техперсонал" else "T Texxodimlar"),
                 DiplomatFilterSubTab.CONSULAR_X to (if (isRussian) "X Консульства" else "X Konsulliklar")
             )
@@ -395,127 +429,124 @@ fun DiplomatSearchScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(filteredDiplomats, key = { it.id }) { rule ->
-                val samplePlate = when {
-                    rule.series == "CMD" && rule.countryCode != null -> {
-                        val c = if (rule.countryCode < 10) "0${rule.countryCode}01" else "${rule.countryCode}01"
-                        "CMD $c"
-                    }
-                    rule.series == "D" && rule.countryCode != null -> {
-                        val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "D $c 001"
-                    }
-                    rule.series == "UN" -> "UN 0001"
-                    rule.series == "T" && rule.countryCode != null -> {
-                        val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "T $c 012"
-                    }
-                    rule.series == "X" && rule.countryCode != null -> {
-                        val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
-                        "X $c 001"
-                    }
-                    rule.series == "CMD" -> "CMD 0701"
-                    rule.series == "D" -> "D 007 012"
-                    rule.series == "T" -> "T 007 012"
-                    rule.series == "X" -> "X 007 001"
-                    rule.countryCode != null -> {
-                        val c = if (rule.countryCode < 10) "0${rule.countryCode}01" else "${rule.countryCode}01"
-                        "CMD $c"
-                    }
-                    else -> "CMD 0001"
+            if (subTab in listOf(
+                    DiplomatFilterSubTab.ALL,
+                    DiplomatFilterSubTab.HEADS_CMD,
+                    DiplomatFilterSubTab.DIPLOMATS_D,
+                    DiplomatFilterSubTab.UN_MISSION
+                )
+            ) {
+                items(filteredDiplomaticMissions, key = { it.codeDisplay }) { mission ->
+                    DiplomaticCountryCard(
+                        mission = mission,
+                        isRussian = isRussian,
+                        onSelectPlate = { samplePlate, _ ->
+                            val targetPlate = when (subTab) {
+                                DiplomatFilterSubTab.HEADS_CMD -> mission.cmdPlate ?: samplePlate
+                                DiplomatFilterSubTab.DIPLOMATS_D -> mission.dPlate ?: samplePlate
+                                else -> samplePlate
+                            }
+                            onDiplomatSelected(targetPlate)
+                        }
+                    )
                 }
+            } else {
+                items(filteredOtherDiplomats, key = { it.id }) { rule ->
+                    val samplePlate = when {
+                        rule.series == "T" && rule.countryCode != null -> {
+                            val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
+                            "T $c 012"
+                        }
+                        rule.series == "X" && rule.countryCode != null -> {
+                            val c = if (rule.countryCode < 10) "00${rule.countryCode}" else if (rule.countryCode < 100) "0${rule.countryCode}" else "${rule.countryCode}"
+                            "X $c 001"
+                        }
+                        rule.series == "T" -> "T 007 012"
+                        rule.series == "X" -> "X 007 001"
+                        else -> "CMD 0101"
+                    }
 
-                val country = if (isRussian) rule.countryNameRu else rule.countryNameUz
-                val orgTitle = if (isRussian) rule.orgNameRu else rule.orgNameUz
-                val desc = if (isRussian) rule.descriptionRu else rule.descriptionUz
-                val isUN = rule.series == "UN"
+                    val country = if (isRussian) rule.countryNameRu else rule.countryNameUz
+                    val orgTitle = if (isRussian) rule.orgNameRu else rule.orgNameUz
+                    val desc = if (isRussian) rule.descriptionRu else rule.descriptionUz
+                    val flag = DiplomaticFlags.getFlag(rule.countryCode)
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AutoSurface)
-                        .border(1.dp, AutoBorder, RoundedCornerShape(12.dp))
-                        .clickable { onDiplomatSelected(samplePlate) }
-                        .padding(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AutoSurface)
+                            .border(1.dp, AutoBorder, RoundedCornerShape(12.dp))
+                            .clickable { onDiplomatSelected(samplePlate) }
+                            .padding(14.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Code / Series badge
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            if (isUN) Color(0xFF1D4ED8).copy(alpha = 0.2f)
-                                            else PlateEvGreenBadge.copy(alpha = 0.18f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(PlateEvGreenBadge.copy(alpha = 0.18f))
+                                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = if (rule.countryCode != null) "Код ${rule.countryCode}" else (rule.series ?: "DIP"),
+                                            color = PlateEvGreenBadge,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
                                         )
-                                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = if (rule.countryCode != null) "Код ${rule.countryCode}" else (rule.series ?: "DIP"),
-                                        color = if (isUN) Color(0xFF60A5FA) else PlateEvGreenBadge,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    }
+
+                                    if (country != null) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "$flag $country",
+                                            color = AutoTextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
 
-                                if (country != null) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = country,
-                                        color = AutoTextPrimary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = orgTitle,
+                                    color = AutoTextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Text(
+                                    text = desc,
+                                    color = AutoTextMuted,
+                                    fontSize = 11.sp,
+                                    maxLines = 2
+                                )
                             }
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                            Text(
-                                text = orgTitle,
-                                color = AutoTextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = desc,
-                                color = AutoTextMuted,
-                                fontSize = 11.sp,
-                                maxLines = 2
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Sample plate chip
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (isUN) Color(0xFF1E3A8A) else Color(0xFF064E3B)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF064E3B))
+                                    .border(1.dp, PlateEvGreenBadge, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = samplePlate,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                .border(
-                                    1.dp,
-                                    if (isUN) Color(0xFF60A5FA) else PlateEvGreenBadge,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = samplePlate,
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            }
                         }
                     }
                 }

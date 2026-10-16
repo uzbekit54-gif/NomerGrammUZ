@@ -96,7 +96,14 @@ fun CompactPlateCard(
                 }
 
                 // Region / Country pill
-                val locationTag = result.countryName ?: result.regionTitle
+                val flagEmoji = if (result.countryName != null) {
+                    com.example.nomergrammuz.domain.model.DiplomaticFlags.getFlag(result.primaryRule?.countryCode)
+                } else null
+                val locationTag = when {
+                    result.countryName != null -> "$flagEmoji  ${result.countryName}"
+                    result.regionTitle != null -> result.regionTitle
+                    else -> null
+                }
                 if (!locationTag.isNullOrBlank()) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

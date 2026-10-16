@@ -20,9 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -32,8 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,7 +40,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,8 +75,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.Color
 import com.example.nomergrammuz.domain.model.PlateCategory
+import com.example.nomergrammuz.domain.model.PlateFormatType
 import com.example.nomergrammuz.domain.model.PlateRule
 import com.example.nomergrammuz.domain.model.PlateTheme
+import com.example.nomergrammuz.domain.model.DiplomaticFlags
 import com.example.nomergrammuz.ui.saved.SavedPlatesScreen
 import com.example.nomergrammuz.ui.search.DiplomatSearchScreen
 import com.example.nomergrammuz.ui.search.GovernmentSearchScreen
@@ -144,6 +142,8 @@ fun MainAppHost() {
     var parseResult by remember { mutableStateOf<ParsedPlateResult?>(null) }
     var favoritesList by remember { mutableStateOf(userPrefsRepo.getFavorites()) }
     var historyList by remember { mutableStateOf(userPrefsRepo.getHistory()) }
+    val plateFocusRequester = remember { FocusRequester() }
+    var isPlateFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(inputText, isRussian) {
         val res = parserEngine.parse(inputText, isRussian = isRussian)
@@ -257,8 +257,12 @@ fun MainAppHost() {
         AppScreenMode.CATALOG -> {
             CatalogScreen(
                 rules = allRules,
-                initialTab = CatalogFilterTab.ALL,
+                initialTab = CatalogFilterTab.REGIONS,
                 isRussian = isRussian,
+                onPlateSelected = { plate ->
+                    inputText = plate
+                    currentScreen = AppScreenMode.MAIN
+                },
                 onRuleSelected = { selectedRule ->
                     val samplePlate = when {
                         selectedRule.series == "CMD" && selectedRule.countryCode != null -> {
@@ -479,7 +483,6 @@ fun MainAppHost() {
 
             val mainScrollState = rememberScrollState()
             val coroutineScope = rememberCoroutineScope()
-            val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
             Scaffold(
                 modifier = Modifier
@@ -491,9 +494,10 @@ fun MainAppHost() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
+                        .statusBarsPadding()
                         .imePadding()
                         .verticalScroll(mainScrollState)
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
                     // Header Row: App Title & Language Toggle
                     Row(
@@ -565,12 +569,323 @@ fun MainAppHost() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Photorealistic Plate Preview
+                    // Photorealistic Interactive Plate (Direct In-Plate Input)
                     parseResult?.let { result ->
                         UzbekistanLicensePlate(
                             result = result,
-                            placeholderText = "01 A 001 AA"
+                            placeholderText = when (activeCategory) {
+                                MainSearchCategory.DIPLOMATS -> "CMD 0701"
+                                MainSearchCategory.GOVERNMENT -> "PAA 001"
+                                MainSearchCategory.MILITARY -> "01 1234 MV"
+                                else -> "01 A 001 AA"
+                            },
+                            isEditable = true,
+                            inputText = inputText,
+                            onInputTextChange = { newText ->
+                                inputText = newText
+                            },
+                            focusRequester = plateFocusRequester,
+                            isFocused = isPlateFocused,
+                            onFocusChange = { isPlateFocused = it },
+                            onClearText = {
+                                inputText = ""
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                            }
                         )
+
+                        // Interactive Plate Status / Prompt Cue
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, start = 4.dp, end = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isPlateFocused) PlateEvGreenBadge else AutoTextMuted)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isPlateFocused) {
+                                        if (isRussian) "Печатайте на клавиатуре" else "Klaviaturada tering"
+                                    } else {
+                                        if (isRussian) "👆 Нажмите на номер для ввода" else "👆 Raqam kiritish uchun bosing"
+                                    },
+                                    color = if (isPlateFocused) PlateEvGreenBadge else AutoTextMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isPlateFocused) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1
+                                )
+                            }
+
+                            if (inputText.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(AutoSurface)
+                                        .border(1.dp, AutoBorder, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            inputText = ""
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = if (isRussian) "✕ Очистить" else "✕ Bekor qilish",
+                                        color = AutoTextMuted,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Quick Diplomatic Toggle (CMD <-> D) with Country Flag
+                        val dipCountryCode = result.primaryRule?.countryCode
+                        if (dipCountryCode != null && (result.formatType == PlateFormatType.DIPLOMATIC_HEAD || result.formatType == PlateFormatType.DIPLOMAT)) {
+                            val isHead = result.formatType == PlateFormatType.DIPLOMATIC_HEAD
+                            val codeStr2 = if (dipCountryCode < 10) "0$dipCountryCode" else "$dipCountryCode"
+                            val codeStr3 = if (dipCountryCode < 10) "00$dipCountryCode" else if (dipCountryCode < 100) "0$dipCountryCode" else "$dipCountryCode"
+                            val targetPlate = if (isHead) "D $codeStr3 001" else "CMD ${codeStr2}01"
+                            val flag = DiplomaticFlags.getFlag(dipCountryCode)
+                            val toggleLabel = if (isHead) {
+                                if (isRussian) "$flag ↔ Показать дипломата ($targetPlate)" else "$flag ↔ Diplomat raqami ($targetPlate)"
+                            } else {
+                                if (isRussian) "$flag ↔ Показать посла ($targetPlate)" else "$flag ↔ Elchi raqami ($targetPlate)"
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF0F291E))
+                                    .border(1.dp, PlateEvGreenBadge.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        inputText = targetPlate
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = toggleLabel,
+                                    color = PlateEvGreenBadge,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
+                        CompactPlateCard(
+                            result = result,
+                            isRussian = isRussian,
+                            isFavorite = userPrefsRepo.isFavorite(result.formattedPlate),
+                            onToggleFavorite = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                userPrefsRepo.toggleFavorite(
+                                    SavedPlateItem(
+                                        plate = result.formattedPlate,
+                                        title = result.organizationName,
+                                        subtitle = result.description,
+                                        formatType = result.formatType,
+                                        theme = result.theme
+                                    )
+                                )
+                                favoritesList = userPrefsRepo.getFavorites()
+                            },
+                            onShare = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "NomerGramm UZ: ${result.formattedPlate}")
+                                    val shareText = buildString {
+                                        append("🇺🇿 NomerGramm UZ\n")
+                                        append("Номер: ${result.formattedPlate}\n")
+                                        append("Организация: ${result.organizationName}\n")
+                                        append("Статус: ${result.description}\n")
+                                        if (!result.countryName.isNullOrBlank()) append("Страна: ${result.countryName}\n")
+                                        if (!result.regionTitle.isNullOrBlank()) append("Регион: ${result.regionTitle}\n")
+                                        append("Основание: ПКМ РУз №131 от 27.06.2007")
+                                    }
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, if (isRussian) "Поделиться номером" else "Raqamni ulashish"))
+                            },
+                            onCopy = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Plate", "${result.formattedPlate}: ${result.organizationName}")
+                                clipboard.setPrimaryClip(clip)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Active Category Banner (placed directly under card and above category buttons)
+                    if (activeCategory != MainSearchCategory.ALL) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(PlateEvGreenBadge)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = when (activeCategory) {
+                                        MainSearchCategory.REGIONS -> if (isRussian) "Режим: Регионы (01–95)" else "Rejim: Hududlar (01–95)"
+                                        MainSearchCategory.DIPLOMATS -> if (isRussian) "Режим: Дипломаты (CMD, D, UN, T, X)" else "Rejim: Diplomatlar"
+                                        MainSearchCategory.GOVERNMENT -> if (isRussian) "Режим: Госорганы и ведомства" else "Rejim: Davlat organlari"
+                                        MainSearchCategory.MILITARY -> if (isRussian) "Режим: Военные и спецслужбы" else "Rejim: Harbiy & Maxsus"
+                                        else -> ""
+                                    },
+                                    color = PlateEvGreenBadge,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(AutoSurface)
+                                    .border(1.dp, AutoBorder, RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        activeCategory = MainSearchCategory.ALL
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isRussian) "✕ Сбросить" else "✕ Bekor qilish",
+                                    color = AutoTextMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // Quick Category Samples Chips Carousel (under card, above buttons)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        categoryChips.forEach { (code, label) ->
+                            val isSelected = inputText.equals(code, ignoreCase = true) ||
+                                    (code.length <= 4 && inputText.startsWith(code, ignoreCase = true))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) PlateEvGreenBadge.copy(alpha = 0.2f) else AutoSurface)
+                                    .border(
+                                        width = if (isSelected) 1.dp else 0.5.dp,
+                                        color = if (isSelected) PlateEvGreenBadge else AutoBorder,
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .clickable {
+                                        inputText = code
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) PlateEvGreenBadge else AutoTextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    // Matching category rule quick-select pills
+                    if (categorySuggestions.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            categorySuggestions.forEach { rule ->
+                                val samplePlate = getSamplePlate(rule)
+                                val isCurrent = inputText.equals(samplePlate, ignoreCase = true)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isCurrent) PlateEvGreenBadge.copy(alpha = 0.2f) else AutoSurface)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isCurrent) PlateEvGreenBadge else AutoBorder,
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            inputText = samplePlate
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        val tag = rule.regionCode ?: rule.series?.split(",")?.first()?.trim() ?: "UZ"
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(
+                                                    if (rule.plateTheme == PlateTheme.BLACK) Color(0xFF101214)
+                                                    else if (rule.plateTheme == PlateTheme.GREEN) Color(0xFF14532D)
+                                                    else if (rule.plateTheme == PlateTheme.BLUE) Color(0xFF1E3A8A)
+                                                    else PlateEvGreenBadge.copy(alpha = 0.2f)
+                                                )
+                                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = tag,
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isRussian) rule.orgNameRu else rule.orgNameUz,
+                                            color = AutoTextPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))
@@ -702,285 +1017,7 @@ fun MainAppHost() {
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Active Category Banner
-                    if (activeCategory != MainSearchCategory.ALL) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(PlateEvGreenBadge)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = when (activeCategory) {
-                                        MainSearchCategory.REGIONS -> if (isRussian) "Режим: Регионы (01–95)" else "Rejim: Hududlar (01–95)"
-                                        MainSearchCategory.DIPLOMATS -> if (isRussian) "Режим: Дипломаты (CMD, D, UN, T, X)" else "Rejim: Diplomatlar"
-                                        MainSearchCategory.GOVERNMENT -> if (isRussian) "Режим: Госорганы и ведомства" else "Rejim: Davlat organlari"
-                                        MainSearchCategory.MILITARY -> if (isRussian) "Режим: Военные и спецслужбы" else "Rejim: Harbiy & Maxsus"
-                                        else -> ""
-                                    },
-                                    color = PlateEvGreenBadge,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(AutoSurface)
-                                    .border(1.dp, AutoBorder, RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        activeCategory = MainSearchCategory.ALL
-                                        keyboardController?.hide()
-                                        focusManager.clearFocus()
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (isRussian) "✕ Сбросить" else "✕ Bekor qilish",
-                                    color = AutoTextMuted,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
-
-                    // Search Input Field
-                    val inputInteractionSource = remember { MutableInteractionSource() }
-                    LaunchedEffect(inputInteractionSource) {
-                        inputInteractionSource.interactions.collect { interaction ->
-                            if (interaction is PressInteraction.Release) {
-                                keyboardController?.show()
-                                coroutineScope.launch {
-                                    delay(150)
-                                    bringIntoViewRequester.bringIntoView()
-                                }
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        interactionSource = inputInteractionSource,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .bringIntoViewRequester(bringIntoViewRequester)
-                            .onFocusEvent { focusState ->
-                                if (focusState.isFocused) {
-                                    coroutineScope.launch {
-                                        delay(200)
-                                        bringIntoViewRequester.bringIntoView()
-                                    }
-                                }
-                            },
-                        placeholder = {
-                            Text(
-                                text = searchPlaceholder,
-                                color = AutoTextMuted,
-                                fontSize = 13.sp
-                            )
-                        },
-                        trailingIcon = {
-                            if (inputText.isNotEmpty()) {
-                                Text(
-                                    text = "✕",
-                                    color = AutoTextMuted,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            inputText = ""
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
-                                        }
-                                        .padding(8.dp)
-                                )
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PlateEvGreenBadge,
-                            unfocusedBorderColor = if (activeCategory != MainSearchCategory.ALL) PlateEvGreenBadge.copy(alpha = 0.5f) else AutoBorder,
-                            focusedContainerColor = AutoSurface,
-                            unfocusedContainerColor = AutoSurface,
-                            focusedTextColor = AutoTextPrimary,
-                            unfocusedTextColor = AutoTextPrimary
-                        ),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Characters,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                            }
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Quick Category Samples Chips (Horizontal Scroll)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        categoryChips.forEach { (code, label) ->
-                            val isSelected = inputText.equals(code, ignoreCase = true) ||
-                                    (code.length <= 4 && inputText.startsWith(code, ignoreCase = true))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) PlateEvGreenBadge.copy(alpha = 0.2f) else AutoSurface)
-                                    .border(
-                                        width = if (isSelected) 1.dp else 0.5.dp,
-                                        color = if (isSelected) PlateEvGreenBadge else AutoBorder,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .clickable {
-                                        inputText = code
-                                        keyboardController?.hide()
-                                        focusManager.clearFocus()
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) PlateEvGreenBadge else AutoTextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-
-                    // Matching category rule quick-select pills
-                    if (categorySuggestions.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            categorySuggestions.forEach { rule ->
-                                val samplePlate = getSamplePlate(rule)
-                                val isCurrent = inputText.equals(samplePlate, ignoreCase = true)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isCurrent) PlateEvGreenBadge.copy(alpha = 0.2f) else AutoSurface)
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isCurrent) PlateEvGreenBadge else AutoBorder,
-                                            shape = RoundedCornerShape(10.dp)
-                                        )
-                                        .clickable {
-                                            inputText = samplePlate
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        val tag = rule.regionCode ?: rule.series?.split(",")?.first()?.trim() ?: "UZ"
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(
-                                                    if (rule.plateTheme == PlateTheme.BLACK) Color(0xFF101214)
-                                                    else if (rule.plateTheme == PlateTheme.GREEN) Color(0xFF14532D)
-                                                    else if (rule.plateTheme == PlateTheme.BLUE) Color(0xFF1E3A8A)
-                                                    else PlateEvGreenBadge.copy(alpha = 0.2f)
-                                                )
-                                                .padding(horizontal = 5.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = tag,
-                                                color = Color.White,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isRussian) rule.orgNameRu else rule.orgNameUz,
-                                            color = AutoTextPrimary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Compact Result Card (Decision 2B: Clean, concise; 1A: Favorite & Share)
-                    parseResult?.let { result ->
-                        CompactPlateCard(
-                            result = result,
-                            isRussian = isRussian,
-                            isFavorite = userPrefsRepo.isFavorite(result.formattedPlate),
-                            onToggleFavorite = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                userPrefsRepo.toggleFavorite(
-                                    SavedPlateItem(
-                                        plate = result.formattedPlate,
-                                        title = result.organizationName,
-                                        subtitle = result.description,
-                                        formatType = result.formatType,
-                                        theme = result.theme
-                                    )
-                                )
-                                favoritesList = userPrefsRepo.getFavorites()
-                            },
-                            onShare = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_SUBJECT, "NomerGramm UZ: ${result.formattedPlate}")
-                                    val shareText = buildString {
-                                        append("🇺🇿 NomerGramm UZ\n")
-                                        append("Номер: ${result.formattedPlate}\n")
-                                        append("Организация: ${result.organizationName}\n")
-                                        append("Статус: ${result.description}\n")
-                                        if (!result.countryName.isNullOrBlank()) append("Страна: ${result.countryName}\n")
-                                        if (!result.regionTitle.isNullOrBlank()) append("Регион: ${result.regionTitle}\n")
-                                        append("Основание: ПКМ РУз №131 от 27.06.2007")
-                                    }
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, if (isRussian) "Поделиться номером" else "Raqamni ulashish"))
-                            },
-                            onCopy = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Plate", "${result.formattedPlate}: ${result.organizationName}")
-                                clipboard.setPrimaryClip(clip)
-                            }
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }

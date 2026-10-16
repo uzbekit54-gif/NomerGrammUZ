@@ -14,14 +14,15 @@
 
 | Параметр | Значение |
 |---|---|
-| **Файл APK** | `release/NomerGrammUZ-v1.0-release.apk` |
-| **Размер файла** | ~43.4 МБ (45 542 017 байт) |
+| **Файл APK** | `release/NomerGrammUZ-v1.1-release.apk` |
+| **Файл AAB (App Bundle)** | `release/NomerGrammUZ-v1.1-release.aab` |
+| **Размер APK** | ~43.4 МБ (45 558 420 байт) |
 | **Package Name (Имя пакета)** | `com.example.nomergrammuz` |
-| **Версия (Version Name)** | `1.0` |
-| **Код версии (Version Code)** | `1` |
+| **Версия (Version Name)** | `1.1` |
+| **Код версии (Version Code)** | `2` |
 | **Min SDK** | 24 (Android 7.0+) |
 | **Target SDK** | 35 (Android 15) |
-| **Схема цифровой подписи** | v1 + v2 + v3 (подтверждено `apksigner`) |
+| **Схема цифровой подписи** | v2 + v3 (подтверждено `apksigner`) |
 | **Срок действия ключа** | 10 000 дней (~27 лет, до 2053 года) |
 | **SHA-256 цифровой подписи** | `88a14c3822a0112490a9cf663917161457b0a280dc0562d55f2b32bcfd9e1336` |
 | **SHA-1 цифровой подписи** | `347460cd31422e49a7acb8b8bc686ed5cbd2dc8e` |
@@ -99,6 +100,15 @@ NomerGramm UZ — профессиональный автомобильный о
 - Ссылка на политику (GitHub Raw):
   `https://raw.githubusercontent.com/uzbekit54-gif/NomerGrammUZ/main/release/PRIVACY_POLICY.md`
 
+### 3.7. Что нового в версии 1.1 (Список изменений для RuStore Консоли)
+```text
+- Добавлена адаптивная экранная клавиатура для корректного ввода на любых моделях и диагоналях смартфонов.
+- Исправлен порядок символов дипломатических номеров (D, T, X) в строгом соответствии со стандартом ПКМ РУз № 131.
+- Устранено дублирование (зеркалирование) символов региона и номера при быстром наборе.
+- Интегрирована новая официальная HD-иконка приложения.
+- Повышена общая стабильность и оптимизирована работа офлайн-сканера.
+```
+
 ---
 
 ## 4. Графические материалы (Скриншоты и Иконка)
@@ -120,10 +130,11 @@ NomerGramm UZ — профессиональный автомобильный о
 
 1. **Авторизация**: Перейдите на [https://console.rustore.ru/](https://console.rustore.ru/) и войдите в аккаунт разработчика.
 2. **Создание приложения**: Нажмите зеленую кнопку **«Добавить приложение»** в правом верхнем углу.
-3. **Загрузка APK**:
-   - Выберите вкладку **«Загрузить версию»**.
-   - Перетащите файл [`release/NomerGrammUZ-v1.0-release.apk`](file:///c:/Users/User/AndroidStudioProjects/NomerGrammUZ/release/NomerGrammUZ-v1.0-release.apk).
-   - Система автоматически считает `com.example.nomergrammuz`, версию `1.0` и валидность подписи v2/v3.
+3. **Загрузка APK / AAB**:
+   - Выберите вкладку **«Загрузить версию»** (или «Обновить версию»).
+   - Перетащите файл [`release/NomerGrammUZ-v1.1-release.apk`](file:///c:/Users/User/AndroidStudioProjects/NomerGrammUZ/release/NomerGrammUZ-v1.1-release.apk) (или AAB [`release/NomerGrammUZ-v1.1-release.aab`](file:///c:/Users/User/AndroidStudioProjects/NomerGrammUZ/release/NomerGrammUZ-v1.1-release.aab)).
+   - Система автоматически считает `com.example.nomergrammuz`, версию `1.1` (versionCode `2`) и валидность подписи v2/v3.
+   - В поле «Что нового» вставьте текст из раздела 3.7.
 4. **Заполнение карточки**:
    - Вставьте название: `NomerGramm UZ — Номера РУз`.
    - Вставьте краткое и полное описание (из раздела 3 выше).

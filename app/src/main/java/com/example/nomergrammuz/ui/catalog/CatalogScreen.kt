@@ -38,7 +38,10 @@ import androidx.compose.ui.unit.sp
 import com.example.nomergrammuz.domain.model.PlateCategory
 import com.example.nomergrammuz.domain.model.PlateRule
 import com.example.nomergrammuz.domain.model.PlateTheme
+import com.example.nomergrammuz.domain.model.DiplomaticFlags
+import com.example.nomergrammuz.domain.model.buildDiplomaticCountryMissions
 import com.example.nomergrammuz.ui.components.AutoShrinkText
+import com.example.nomergrammuz.ui.components.DiplomaticCountryCard
 import com.example.nomergrammuz.ui.theme.AutoBackground
 import com.example.nomergrammuz.ui.theme.AutoBorder
 import com.example.nomergrammuz.ui.theme.AutoSurface
@@ -47,7 +50,6 @@ import com.example.nomergrammuz.ui.theme.AutoTextPrimary
 import com.example.nomergrammuz.ui.theme.PlateEvGreenBadge
 
 enum class CatalogFilterTab {
-    ALL,
     REGIONS,
     DIPLOMATIC,
     GOVERNMENT,
@@ -59,9 +61,10 @@ enum class CatalogFilterTab {
 @Composable
 fun CatalogScreen(
     rules: List<PlateRule>,
-    initialTab: CatalogFilterTab = CatalogFilterTab.ALL,
+    initialTab: CatalogFilterTab = CatalogFilterTab.REGIONS,
     isRussian: Boolean = true,
     onRuleSelected: (PlateRule) -> Unit,
+    onPlateSelected: ((String) -> Unit)? = null,
     onRefreshDatabase: (suspend () -> String)? = null,
     onBack: () -> Unit
 ) {
@@ -72,10 +75,31 @@ fun CatalogScreen(
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
+    val diplomaticMissions = remember(rules) {
+        buildDiplomaticCountryMissions(rules)
+    }
+
+    val filteredDiplomaticMissions = remember(diplomaticMissions, searchQuery, isRussian) {
+        if (searchQuery.isBlank()) {
+            diplomaticMissions
+        } else {
+            val q = searchQuery.trim().lowercase()
+            diplomaticMissions.filter { mission ->
+                mission.countryNameRu.lowercase().contains(q) ||
+                        mission.countryNameUz.lowercase().contains(q) ||
+                        mission.orgNameRu.lowercase().contains(q) ||
+                        mission.orgNameUz.lowercase().contains(q) ||
+                        mission.codeDisplay.lowercase().contains(q) ||
+                        (mission.countryCode?.toString() == q) ||
+                        (mission.countryCode != null && String.format("%02d", mission.countryCode).contains(q)) ||
+                        q in listOf("cmd", "d", "un")
+            }
+        }
+    }
+
     val filteredRules = remember(rules, selectedTab, searchQuery, isRussian) {
         rules.filter { rule ->
             val matchesTab = when (selectedTab) {
-                CatalogFilterTab.ALL -> true
                 CatalogFilterTab.REGIONS -> rule.category == PlateCategory.REGIONAL
                 CatalogFilterTab.DIPLOMATIC -> rule.category == PlateCategory.DIPLOMATIC && rule.series !in listOf("M", "H")
                 CatalogFilterTab.GOVERNMENT -> (rule.category == PlateCategory.STATE_AUTHORITY || rule.series in listOf("DAV", "STY", "PAA", "PPP", "APC", "UZB", "ZDF")) && rule.category != PlateCategory.MILITARY
@@ -231,7 +255,6 @@ fun CatalogScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val tabs = listOf(
-                CatalogFilterTab.ALL to (if (isRussian) "Все" else "Barchasi"),
                 CatalogFilterTab.REGIONS to (if (isRussian) "📍 Регионы" else "📍 Hududlar"),
                 CatalogFilterTab.DIPLOMATIC to (if (isRussian) "🌍 Дипломаты" else "🌍 Diplomatiya"),
                 CatalogFilterTab.GOVERNMENT to (if (isRussian) "🏛️ Госорганы" else "🏛️ Davlat organlari"),
@@ -271,12 +294,28 @@ fun CatalogScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(filteredRules, key = { it.id }) { rule ->
-                CatalogRuleItem(
-                    rule = rule,
-                    isRussian = isRussian,
-                    onClick = { onRuleSelected(rule) }
-                )
+            if (selectedTab == CatalogFilterTab.DIPLOMATIC) {
+                items(filteredDiplomaticMissions, key = { it.codeDisplay }) { mission ->
+                    DiplomaticCountryCard(
+                        mission = mission,
+                        isRussian = isRussian,
+                        onSelectPlate = { samplePlate, rule ->
+                            if (onPlateSelected != null) {
+                                onPlateSelected(samplePlate)
+                            } else {
+                                onRuleSelected(rule)
+                            }
+                        }
+                    )
+                }
+            } else {
+                items(filteredRules, key = { it.id }) { rule ->
+                    CatalogRuleItem(
+                        rule = rule,
+                        isRussian = isRussian,
+                        onClick = { onRuleSelected(rule) }
+                    )
+                }
             }
         }
     }
@@ -331,8 +370,9 @@ fun CatalogRuleItem(
                     val country = if (isRussian) rule.countryNameRu else rule.countryNameUz
                     if (country != null) {
                         Spacer(modifier = Modifier.padding(start = 8.dp))
+                        val flag = DiplomaticFlags.getFlag(rule.countryCode)
                         Text(
-                            text = country,
+                            text = "$flag $country",
                             color = AutoTextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
